@@ -124,16 +124,30 @@ async function openCamera() {
   const video = $('camera-video');
   const overlay = $('camera-status-overlay');
   try {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error('This browser does not support camera access.');
+    }
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 480, height: 480, facingMode: 'user' },
+      video: { facingMode: { ideal: 'user' }, width: { ideal: 480 }, height: { ideal: 480 } },
     });
     S.camStream = stream;
     video.srcObject = stream;
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('Camera preview did not start.')), 8000);
+      video.onloadedmetadata = () => { clearTimeout(timer); resolve(); };
+    });
     await video.play();
+    if (!video.videoWidth || !video.videoHeight) {
+      throw new Error('Camera preview is unavailable.');
+    }
     if (overlay) overlay.style.opacity = '0';
     $('camera-wrap').classList.add('detecting');
   } catch (err) {
-    throw new Error('Camera access denied. Please allow camera and try again.');
+    closeCamera();
+    const detail = err?.name === 'NotAllowedError'
+      ? 'Camera permission was blocked. Allow camera access in your browser settings and retry.'
+      : (err?.message || 'Camera preview could not start.');
+    throw new Error(detail);
   }
 }
 
@@ -176,10 +190,16 @@ function detectFace(requireBlink = false) {
         return reject(new Error('Detection timed out. Please try again.'));
       }
 
-      const det = await faceapi
-        .detectSingleFace(video, FACE_DETECT_OPTS)
-        .withFaceLandmarks()
-        .withFaceDescriptor();
+      let det;
+      try {
+        det = await faceapi
+          .detectSingleFace(video, FACE_DETECT_OPTS)
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+      } catch (err) {
+        clearInterval(S.detectLoop);
+        return reject(new Error('Face detection could not start. Refresh the page and try again.'));
+      }
 
       if (!det) {
         setAuthStatus('No face detected — look at the camera', 'warning');
