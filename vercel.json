@@ -24,12 +24,5 @@
       "src": "/(.*)",
       "dest": "/api/index.py"
     }
-  ],
-  "env": {
-    "MONGO_URI": "@mongo_uri",
-    "OPENROUTER_API_KEY": "@openrouter_api_key",
-    "SECRET_KEY": "@secret_key",
-    "JWT_SECRET": "@jwt_secret",
-    "ADMIN_PIN": "@admin_pin"
-  }
+  ]
 }
