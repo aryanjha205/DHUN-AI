@@ -307,6 +307,16 @@ def serve_static(filename):
     return send_from_directory(os.path.join(BASE_DIR, "static"), filename)
 
 
+@app.route("/sw.js")
+def service_worker():
+    return send_from_directory(os.path.join(BASE_DIR, "static"), "sw.js")
+
+
+@app.route("/manifest.json")
+def manifest():
+    return send_from_directory(os.path.join(BASE_DIR, "static"), "manifest.json")
+
+
 # ── Health ────────────────────────────────────────────────────────────────────
 @app.route("/api/health")
 def health():
