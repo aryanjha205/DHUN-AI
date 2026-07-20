@@ -197,9 +197,10 @@ input, select, textarea { font-family: inherit; }
 }
 .camera-ring {
   position: absolute; inset: -6px; border-radius: 50%; z-index: 5;
-  border: 3px solid transparent;
-  background: linear-gradient(var(--bg), var(--bg)) padding-box,
-              linear-gradient(135deg, var(--primary), var(--secondary)) border-box;
+  pointer-events: none;
+  border: 3px solid var(--primary);
+  background: transparent;
+  box-shadow: 0 0 0 1px var(--secondary), 0 0 18px var(--primary-glow);
   animation: rotatePulse 4s linear infinite;
 }
 @keyframes rotatePulse {
