@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#030308" />
+  <meta name="description" content="DHUN AI — Generate stunning AI music with your voice, face auth, and zero passwords." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="DHUN AI" />
+  <title>DHUN AI — AI Music Generator</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+  <!-- Apple touch icon -->
+  <link rel="apple-touch-icon" href="/static/icon-192.png" />
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>" />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- face-api.js (face detection + recognition) -->
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+  <!-- Chart.js (admin analytics) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+  <!-- Main stylesheet -->
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     LOADING SCREEN
+═══════════════════════════════════════════════════════════════════════════ -->
+<div id="loading-screen">
+  <div class="loader-content">
+    <div class="loader-logo">
+      <div class="loader-icon">🎵</div>
+      <div class="loader-rings">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+    <h1 class="loader-title">DHUN AI</h1>
+    <p class="loader-sub">Loading AI models…</p>
+    <div class="loader-bar-wrap">
+      <div class="loader-bar" id="model-load-bar"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     AUTH SCREEN
+═══════════════════════════════════════════════════════════════════════════ -->
+<div id="auth-screen" class="screen hidden">
+  <div class="auth-bg">
+    <div class="auth-orb auth-orb-1"></div>
+    <div class="auth-orb auth-orb-2"></div>
+    <div class="auth-orb auth-orb-3"></div>
+  </div>
+
+  <div class="auth-container">
+    <!-- Branding -->
+    <div class="auth-brand">
+      <span class="brand-icon">🎵</span>
+      <span class="brand-name">DHUN AI</span>
+    </div>
+    <h2 class="auth-headline">Make music with your <span class="gradient-text">face</span></h2>
+    <p class="auth-sub">No passwords. No emails. Just your face — and the music begins.</p>
+
+    <!-- Camera View -->
+    <div class="camera-wrap" id="camera-wrap">
+      <div class="camera-ring"></div>
+      <video id="camera-video" autoplay muted playsinline></video>
+      <canvas id="camera-canvas"></canvas>
+      <div class="camera-overlay-text" id="camera-status-overlay">
+        <span id="camera-status-icon">📷</span>
+        <span id="camera-status-text">Camera will appear here</span>
+      </div>
+      <!-- Face detection box (drawn by JS) -->
+      <div class="face-box" id="face-box"></div>
+    </div>
+
+    <!-- Status message -->
+    <div class="auth-status" id="auth-status">
+      <span id="auth-status-text">Click a button to begin</span>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="auth-actions">
+      <button id="btn-register" class="btn-auth btn-register" onclick="startRegister()">
+        <span class="btn-icon">✨</span>
+        <span>Register with Face</span>
+      </button>
+      <button id="btn-login" class="btn-auth btn-login" onclick="startLogin()">
+        <span class="btn-icon">🔓</span>
+        <span>Login with Face</span>
+      </button>
+    </div>
+
+    <!-- Admin hint -->
+    <p class="auth-admin-hint">
+      Administrator?
+      <button class="link-btn" onclick="showAdminPin()">Access Admin Panel</button>
+    </p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MAIN APP (shown after auth)
+═══════════════════════════════════════════════════════════════════════════ -->
+<div id="app-screen" class="screen hidden">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="brand-icon-sm">🎵</span>
+      <span class="sidebar-brand">DHUN AI</span>
+      <button class="sidebar-close" id="sidebar-close" onclick="toggleSidebar()">✕</button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-view="library" onclick="showView('library')">
+        <span class="nav-icon">🎧</span><span>My Library</span>
+      </a>
+      <a href="#" class="nav-item" data-view="generate" onclick="showGenerator()">
+        <span class="nav-icon">✨</span><span>Generate Song</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user" id="sidebar-user">
+        <div class="user-avatar">👤</div>
+        <div class="user-info">
+          <span class="user-label">Logged in</span>
+          <span class="user-id" id="sidebar-face-id">—</span>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()" title="Logout">⏏</button>
+    </div>
+  </aside>
+
+  <!-- ── Backdrop (mobile) ── -->
+  <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="toggleSidebar()"></div>
+
+  <!-- ── Main Content ── -->
+  <main class="main-content">
+
+    <!-- Top bar (mobile) -->
+    <header class="topbar">
+      <button class="hamburger" onclick="toggleSidebar()">☰</button>
+      <span class="topbar-title">🎵 DHUN AI</span>
+      <button class="topbar-generate" onclick="showGenerator()">+ Generate</button>
+    </header>
+
+    <!-- ── Library View ── -->
+    <section id="view-library" class="view active">
+      <!-- Library header -->
+      <div class="library-header">
+        <div class="library-title-row">
+          <h1 class="page-title">Your Music</h1>
+          <button class="btn-generate-desktop" onclick="showGenerator()">
+            <span>✨ Generate Song</span>
+          </button>
+        </div>
+
+        <!-- Search & Filters -->
+        <div class="library-controls">
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input
+              type="text"
+              id="search-input"
+              class="search-input"
+              placeholder="Search your songs…"
+              oninput="onSearchInput(this.value)"
+            />
+            <button class="search-clear hidden" id="search-clear" onclick="clearSearch()">✕</button>
+          </div>
+          <div class="filter-pills" id="filter-pills">
+            <button class="pill active" data-genre="" onclick="setGenreFilter('')">All</button>
+            <button class="pill" data-genre="Pop" onclick="setGenreFilter('Pop')">Pop</button>
+            <button class="pill" data-genre="Rock" onclick="setGenreFilter('Rock')">Rock</button>
+            <button class="pill" data-genre="Hip-Hop" onclick="setGenreFilter('Hip-Hop')">Hip-Hop</button>
+            <button class="pill" data-genre="Jazz" onclick="setGenreFilter('Jazz')">Jazz</button>
+            <button class="pill" data-genre="Electronic" onclick="setGenreFilter('Electronic')">Electronic</button>
+            <button class="pill" data-genre="Classical" onclick="setGenreFilter('Classical')">Classical</button>
+            <button class="pill" data-genre="R&B" onclick="setGenreFilter('R&amp;B')">R&amp;B</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Songs Grid -->
+      <div class="songs-grid" id="songs-grid">
+        <!-- rendered by JS -->
+      </div>
+
+      <!-- Loading more -->
+      <div class="load-more-wrap hidden" id="load-more-wrap">
+        <button class="btn-load-more" onclick="loadMoreSongs()">Load More</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ── Bottom Player Bar ── -->
+  <div class="player-bar hidden" id="player-bar">
+    <div class="player-cover-wrap">
+      <img class="player-cover" id="player-cover" src="" alt="Album Art" />
+    </div>
+    <div class="player-info">
+      <span class="player-title" id="player-title">—</span>
+      <span class="player-genre" id="player-genre">—</span>
+    </div>
+    <div class="player-controls">
+      <button class="ctrl-btn" onclick="prevSong()" title="Previous">⏮</button>
+      <button class="ctrl-btn ctrl-play" id="play-pause-btn" onclick="togglePlay()" title="Play/Pause">▶</button>
+      <button class="ctrl-btn" onclick="nextSong()" title="Next">⏭</button>
+    </div>
+    <div class="player-progress-wrap" onclick="seekTo(event)">
+      <div class="player-progress-bar" id="progress-bar">
+        <div class="player-progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="player-times">
+        <span id="current-time">0:00</span>
+        <span id="total-time">0:00</span>
+      </div>
+    </div>
+    <div class="player-extras">
+      <button class="ctrl-btn" id="lyrics-btn" onclick="showLyricsPanel()" title="Lyrics">📝</button>
+      <input type="range" class="volume-slider" id="volume-slider" min="0" max="1" step="0.05" value="1" oninput="setVolume(this.value)" title="Volume" />
+      <button class="ctrl-btn expand-btn" onclick="showExpandedPlayer()" title="Expand">⤢</button>
+    </div>
+  </div>
+
+</div><!-- /#app-screen -->
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     GENERATOR MODAL
+═══════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="generator-modal" onclick="onModalOverlayClick(event,'generator-modal')">
+  <div class="modal glass" id="generator-dialog" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 class="modal-title">✨ Generate AI Song</h2>
+      <button class="modal-close" onclick="hideGenerator()">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <label class="form-label">Describe your song *</label>
+      <textarea
+        id="gen-prompt"
+        class="form-textarea"
+        rows="3"
+        maxlength="500"
+        placeholder="e.g. A heartfelt love song about missing someone during a rainy night in Mumbai…"
+      ></textarea>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Genre</label>
+          <select id="gen-genre" class="form-select">
+            <option value="Pop">Pop</option>
+            <option value="Rock">Rock</option>
+            <option value="Hip-Hop">Hip-Hop</option>
+            <option value="Jazz">Jazz</option>
+            <option value="Electronic">Electronic</option>
+            <option value="Classical">Classical</option>
+            <option value="R&B">R&amp;B</option>
+            <option value="Indie">Indie</option>
+            <option value="Folk">Folk</option>
+            <option value="Bollywood">Bollywood</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mood</label>
+          <select id="gen-mood" class="form-select">
+            <option value="Happy">Happy</option>
+            <option value="Sad">Sad</option>
+            <option value="Romantic">Romantic</option>
+            <option value="Energetic">Energetic</option>
+            <option value="Melancholic">Melancholic</option>
+            <option value="Peaceful">Peaceful</option>
+            <option value="Dark">Dark</option>
+            <option value="Uplifting">Uplifting</option>
+            <option value="Nostalgic">Nostalgic</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Language</label>
+          <select id="gen-language" class="form-select">
+            <option value="English">English</option>
+            <option value="Hindi">Hindi</option>
+            <option value="Spanish">Spanish</option>
+            <option value="French">French</option>
+            <option value="Portuguese">Portuguese</option>
+            <option value="Arabic">Arabic</option>
+            <option value="Korean">Korean</option>
+            <option value="Japanese">Japanese</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Duration</label>
+          <select id="gen-duration" class="form-select">
+            <option value="1 minute">~1 min</option>
+            <option value="2 minutes">~2 min</option>
+            <option value="3 minutes" selected>~3 min</option>
+            <option value="4 minutes">~4 min</option>
+            <option value="5 minutes">~5 min</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="hideGenerator()">Cancel</button>
+      <button class="btn-primary btn-generate" id="btn-generate" onclick="generateSong()">
+        <span class="btn-generate-icon">✨</span>
+        <span>Generate Song</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     GENERATION PROGRESS OVERLAY
+═══════════════════════════════════════════════════════════════════════════ -->
+<div class="progress-overlay hidden" id="progress-overlay">
+  <div class="progress-content">
+    <div class="progress-logo-spin">🎵</div>
+    <h2 class="progress-title">Creating Your Song</h2>
+    <p class="progress-sub">Our AI is composing something magical…</p>
+
+    <div class="progress-steps">
+      <div class="progress-step" id="step-1">
+        <div class="step-icon" id="step-1-icon">✍️</div>
+        <div class="step-body">
+          <span class="step-name">Writing Lyrics</span>
+          <span class="step-status" id="step-1-status">Waiting…</span>
+        </div>
+        <div class="step-spinner" id="step-1-spinner"></div>
+      </div>
+      <div class="progress-step" id="step-2">
+        <div class="step-icon" id="step-2-icon">🎨</div>
+        <div class="step-body">
+          <span class="step-name">Designing Album Art</span>
+          <span class="step-status" id="step-2-status">Waiting…</span>
+        </div>
+        <div class="step-spinner" id="step-2-spinner"></div>
+      </div>
+      <div class="progress-step" id="step-3">
+        <div class="step-icon" id="step-3-icon">🎵</div>
+        <div class="step-body">
+          <span class="step-name">Composing Music</span>
+          <span class="step-status" id="step-3-status">Waiting…</span>
+        </div>
+        <div class="step-spinner" id="step-3-spinner"></div>
+      </div>
+      <div class="progress-step" id="step-4">
+        <div class="step-icon" id="step-4-icon">💾</div>
+        <div class="step-body">
+          <span class="step-name">Saving to Library</span>
+          <span class="step-status" id="step-4-status">Waiting…</span>
+        </div>
+        <div class="step-spinner" id="step-4-spinner"></div>
+      </div>
+    </div>
+
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="gen-progress-fill"></div>
+    </div>
+    <p class="progress-eta" id="progress-eta">This usually takes 30–60 seconds</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     LYRICS MODAL
+═══════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="lyrics-modal" onclick="onModalOverlayClick(event,'lyrics-modal')">
+  <div class="modal glass lyrics-dialog" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 class="modal-title" id="lyrics-modal-title">Lyrics</h2>
+      <button class="modal-close" onclick="hideLyrics()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="lyrics-cover-row">
+        <img class="lyrics-cover" id="lyrics-cover" src="" alt="" />
+        <div class="lyrics-meta">
+          <span id="lyrics-genre-badge" class="genre-badge">—</span>
+          <span id="lyrics-mood-badge" class="mood-badge">—</span>
+          <p id="lyrics-prompt" class="lyrics-prompt-text">—</p>
+        </div>
+      </div>
+      <pre class="lyrics-text" id="lyrics-text">—</pre>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="hideLyrics()">Close</button>
+      <button class="btn-primary" id="lyrics-share-btn">🔗 Share</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     EXPANDED PLAYER MODAL
+═══════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="expanded-player" onclick="onModalOverlayClick(event,'expanded-player')">
+  <div class="expanded-player-inner" onclick="event.stopPropagation()">
+    <button class="modal-close expanded-close" onclick="hideExpandedPlayer()">✕</button>
+    <div class="expanded-art-wrap">
+      <img class="expanded-art" id="exp-cover" src="" alt="Album Art" />
+      <div class="expanded-art-glow"></div>
+    </div>
+    <div class="expanded-info">
+      <h2 id="exp-title">—</h2>
+      <p id="exp-genre-mood">—</p>
+    </div>
+    <div class="expanded-progress" onclick="seekTo(event)">
+      <div class="player-progress-bar" id="exp-progress-bar">
+        <div class="player-progress-fill" id="exp-progress-fill"></div>
+      </div>
+      <div class="player-times">
+        <span id="exp-current">0:00</span>
+        <span id="exp-total">0:00</span>
+      </div>
+    </div>
+    <div class="expanded-controls">
+      <button class="ctrl-btn-lg" onclick="prevSong()">⏮</button>
+      <button class="ctrl-btn-lg ctrl-play-lg" id="exp-play-btn" onclick="togglePlay()">▶</button>
+      <button class="ctrl-btn-lg" onclick="nextSong()">⏭</button>
+    </div>
+    <div class="expanded-actions">
+      <button class="action-btn" onclick="showLyricsPanel()">📝 Lyrics</button>
+      <button class="action-btn" id="exp-download-btn">⬇ Download</button>
+      <button class="action-btn" id="exp-share-btn">🔗 Share</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     DELETE CONFIRM MODAL
+═══════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="delete-modal" onclick="onModalOverlayClick(event,'delete-modal')">
+  <div class="modal glass modal-sm" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 class="modal-title">Delete Song?</h2>
+    </div>
+    <div class="modal-body">
+      <p class="delete-warning">This will permanently remove "<strong id="delete-song-name"></strong>" from your library.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="hideDeleteModal()">Cancel</button>
+      <button class="btn-danger" id="confirm-delete-btn" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     ADMIN PANEL
+═══════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="admin-pin-modal" onclick="onModalOverlayClick(event,'admin-pin-modal')">
+  <div class="modal glass modal-sm" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 class="modal-title">🔐 Admin Access</h2>
+      <button class="modal-close" onclick="hideAdminPin()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="form-label">Enter admin PIN</p>
+      <input
+        type="password"
+        id="admin-pin-input"
+        class="form-input pin-input"
+        maxlength="6"
+        placeholder="• • • •"
+        onkeydown="if(event.key==='Enter') submitAdminPin()"
+        autofocus
+      />
+      <p class="pin-error hidden" id="pin-error">Incorrect PIN. Try again.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="hideAdminPin()">Cancel</button>
+      <button class="btn-primary" onclick="submitAdminPin()">Access Panel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin panel full screen -->
+<div id="admin-screen" class="screen hidden">
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <span>🛡️</span> Admin Panel
+      </div>
+      <nav class="admin-nav">
+        <button class="admin-nav-item active" data-tab="overview" onclick="switchAdminTab('overview')">📊 Overview</button>
+        <button class="admin-nav-item" data-tab="users" onclick="switchAdminTab('users')">👥 Users</button>
+        <button class="admin-nav-item" data-tab="songs" onclick="switchAdminTab('songs')">🎵 Songs</button>
+        <button class="admin-nav-item" data-tab="settings" onclick="switchAdminTab('settings')">⚙️ Settings</button>
+        <button class="admin-nav-item" data-tab="logs" onclick="switchAdminTab('logs')">📋 Logs</button>
+      </nav>
+      <button class="admin-back" onclick="exitAdmin()">← Back to App</button>
+    </aside>
+
+    <main class="admin-main">
+      <!-- Overview Tab -->
+      <div class="admin-tab active" id="admin-tab-overview">
+        <h2 class="admin-page-title">📊 Overview</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">👥</div>
+            <div class="stat-val" id="stat-users">—</div>
+            <div class="stat-label">Total Users</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">🎵</div>
+            <div class="stat-val" id="stat-songs">—</div>
+            <div class="stat-label">Total Songs</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">▶</div>
+            <div class="stat-val" id="stat-plays">—</div>
+            <div class="stat-label">Total Plays</div>
+          </div>
+        </div>
+        <div class="charts-row">
+          <div class="chart-card">
+            <h3>Songs by Genre</h3>
+            <canvas id="chart-genre"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Songs Generated (7 days)</h3>
+            <canvas id="chart-daily"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Mood Distribution</h3>
+            <canvas id="chart-mood"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Users Tab -->
+      <div class="admin-tab" id="admin-tab-users">
+        <h2 class="admin-page-title">👥 Users</h2>
+        <div class="admin-table-wrap">
+          <table class="admin-table" id="users-table">
+            <thead>
+              <tr>
+                <th>Face ID</th>
+                <th>Registered</th>
+                <th>Last Login</th>
+                <th>Songs</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody">
+              <tr><td colspan="5" class="loading-row">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Songs Tab -->
+      <div class="admin-tab" id="admin-tab-songs">
+        <h2 class="admin-page-title">🎵 All Songs</h2>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Cover</th>
+                <th>Title</th>
+                <th>Genre</th>
+                <th>Mood</th>
+                <th>User</th>
+                <th>Plays</th>
+                <th>Created</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="admin-songs-tbody">
+              <tr><td colspan="8" class="loading-row">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="admin-pagination" id="admin-songs-pagination"></div>
+      </div>
+
+      <!-- Settings Tab -->
+      <div class="admin-tab" id="admin-tab-settings">
+        <h2 class="admin-page-title">⚙️ Settings</h2>
+        <div class="settings-form">
+          <div class="form-group">
+            <label class="form-label">Lyrics AI Model</label>
+            <input type="text" id="setting-lyrics-model" class="form-input" placeholder="openai/gpt-4o-mini" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cover Art Model</label>
+            <input type="text" id="setting-cover-model" class="form-input" placeholder="black-forest-labs/flux-schnell" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Audio Model</label>
+            <input type="text" id="setting-audio-model" class="form-input" placeholder="google/lyria-2" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Face Match Threshold (0.3–0.8)</label>
+            <input type="number" id="setting-face-threshold" class="form-input" min="0.3" max="0.8" step="0.05" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max Songs Per User</label>
+            <input type="number" id="setting-max-songs" class="form-input" min="1" max="1000" />
+          </div>
+          <button class="btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+        </div>
+      </div>
+
+      <!-- Logs Tab -->
+      <div class="admin-tab" id="admin-tab-logs">
+        <h2 class="admin-page-title">📋 Recent Events</h2>
+        <div class="logs-list" id="logs-list">
+          <p class="loading-row">Loading logs…</p>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     NOTIFICATIONS
+═══════════════════════════════════════════════════════════════════════════ -->
+<div class="notifications" id="notifications"></div>
+
+<!-- PWA Install Banner -->
+<div class="install-banner hidden" id="install-banner">
+  <span>📲 Install DHUN AI for the best experience</span>
+  <button class="btn-install" onclick="installPWA()">Install</button>
+  <button class="install-dismiss" onclick="dismissInstall()">✕</button>
+</div>
+
+<!-- Audio element -->
+<audio id="audio-player" preload="metadata"></audio>
+
+<!-- Main JS -->
+<script src="/static/script.js"></script>
+</body>
+</html>

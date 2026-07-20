@@ -1,0 +1,35 @@
+{
+  "version": 2,
+  "name": "dhun-ai",
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/sw.js",
+      "dest": "/static/sw.js"
+    },
+    {
+      "src": "/manifest.json",
+      "dest": "/static/manifest.json"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.py"
+    }
+  ],
+  "env": {
+    "MONGO_URI": "@mongo_uri",
+    "OPENROUTER_API_KEY": "@openrouter_api_key",
+    "SECRET_KEY": "@secret_key",
+    "JWT_SECRET": "@jwt_secret",
+    "ADMIN_PIN": "@admin_pin"
+  }
+}

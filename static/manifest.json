@@ -1,0 +1,48 @@
+{
+  "name": "DHUN AI — AI Music Generator",
+  "short_name": "DHUN AI",
+  "description": "Generate AI-powered music with face authentication. No passwords — just your face and the music begins.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#030308",
+  "background_color": "#030308",
+  "lang": "en",
+  "scope": "/",
+  "id": "/dhun-ai",
+  "categories": ["music", "entertainment", "productivity"],
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%238b5cf6'/><text x='50%25' y='56%25' font-size='120' text-anchor='middle' dominant-baseline='middle'>🎵</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='80' fill='%238b5cf6'/><text x='50%25' y='56%25' font-size='320' text-anchor='middle' dominant-baseline='middle'>🎵</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/static/screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "DHUN AI Music Library"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Generate Song",
+      "short_name": "Generate",
+      "description": "Create a new AI song",
+      "url": "/?action=generate",
+      "icons": [{ "src": "/static/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
+}
