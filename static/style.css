@@ -610,6 +610,38 @@ input, select, textarea { font-family: inherit; }
 .registration-consent input { margin-top: .15rem; accent-color: var(--primary); }
 .topbar-greeting { margin-left: auto; color: var(--text-2); font-size: .82rem; font-weight: 600; }
 
+/* Light registration form so onboarding matches the admin workspace. */
+#registration-details-modal { background: rgba(15, 24, 18, .50); }
+#registration-details-modal .modal {
+  background: #ffffff;
+  border: 1px solid #dfe7e1;
+  box-shadow: 0 24px 64px rgba(8, 20, 12, .26);
+  color: #18221c;
+}
+#registration-details-modal .modal-header,
+#registration-details-modal .modal-footer { border-color: #dfe7e1; }
+#registration-details-modal .modal-title { color: #18221c; }
+#registration-details-modal .modal-close { background: #f1f6f2; color: #536158; }
+#registration-details-modal .modal-close:hover { background: #e3efe6; color: #0d5d32; }
+#registration-details-modal .registration-intro,
+#registration-details-modal .registration-consent { color: #536158; }
+#registration-details-modal .form-label { color: #39463d; }
+#registration-details-modal .form-input {
+  background: #ffffff;
+  border-color: #ccd8d0;
+  color: #18221c;
+}
+#registration-details-modal .form-input:focus {
+  border-color: #167a45;
+  box-shadow: 0 0 0 3px rgba(22, 122, 69, .12);
+}
+#registration-details-modal .registration-consent input { accent-color: #167a45; }
+#registration-details-modal .btn-primary {
+  background: #167a45;
+  box-shadow: 0 5px 14px rgba(22, 122, 69, .20);
+}
+#registration-details-modal .btn-primary:hover { background: #0d5d32; }
+
 /* ── Forms ── */
 .form-label { display: block; font-size: .8rem; font-weight: 600; color: var(--text-3); margin-bottom: .4rem; }
 .form-group { margin-bottom: 1rem; }
