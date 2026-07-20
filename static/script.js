@@ -175,12 +175,13 @@ function eyeAR(pts) {
  * @param {boolean} requireBlink - If true, waits for a blink (anti-spoofing).
  * @returns {Promise<number[]>} 128-dim face descriptor array.
  */
-function detectFace(requireBlink = false) {
+function detectFace(requireBlink = false, holdMs = 0) {
   return new Promise((resolve, reject) => {
     const video = $('camera-video');
     let blinkDone = !requireBlink;
     let eyeOpen   = true;
     let frames    = 0;
+    let faceDetectedAt = null;
     const MAX_FRAMES = 200; // ~40s at 5fps
 
     S.detectLoop = setInterval(async () => {
@@ -202,6 +203,7 @@ function detectFace(requireBlink = false) {
       }
 
       if (!det) {
+        faceDetectedAt = null;
         setAuthStatus('No face detected — look at the camera', 'warning');
         return;
       }
@@ -221,6 +223,15 @@ function detectFace(requireBlink = false) {
       }
 
       setAuthStatus('Face detected! ✓', 'success');
+
+      if (holdMs > 0) {
+        faceDetectedAt ??= Date.now();
+        const remaining = Math.max(0, Math.ceil((holdMs - (Date.now() - faceDetectedAt)) / 1000));
+        if (remaining > 0) {
+          setAuthStatus(`Face detected — hold still for ${remaining}s`, 'success');
+          return;
+        }
+      }
 
       // Anti-spoofing: blink detection
       if (requireBlink && !blinkDone) {
@@ -257,7 +268,7 @@ window.startRegister = async () => {
   try {
     await openCamera();
     setAuthStatus('Look at the camera and stay still…', 'info');
-    const embedding = await detectFace(false); // no blink for registration
+    const embedding = await detectFace(false, 3000); // 3-second stable registration scan
     closeCamera();
     S.pendingRegistrationEmbedding = embedding;
     setAuthStatus('Face scan complete. Add your details to continue.', 'success');
