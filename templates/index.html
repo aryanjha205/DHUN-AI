@@ -154,6 +154,7 @@
     <header class="topbar">
       <button class="hamburger" onclick="toggleSidebar()">☰</button>
       <span class="topbar-title">🎵 DHUN AI</span>
+      <span class="topbar-greeting" id="topbar-greeting" aria-live="polite"></span>
       <button class="topbar-generate" onclick="showGenerator()">+ Generate</button>
     </header>
 
@@ -487,6 +488,35 @@
   </div>
 </div>
 
+<!-- Registration details, shown only after a face scan completes -->
+<div class="modal-overlay hidden" id="registration-details-modal" onclick="if (event.target === this) cancelRegistrationDetails()">
+  <div class="modal glass modal-sm" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 class="modal-title">👤 Complete your profile</h2>
+      <button class="modal-close" type="button" onclick="cancelRegistrationDetails()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="registration-intro">Your face scan is ready. Add these details to finish creating your account.</p>
+      <div class="form-group">
+        <label class="form-label" for="registration-name">Full name</label>
+        <input class="form-input" id="registration-name" type="text" maxlength="80" autocomplete="name" placeholder="Your name" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="registration-age">Age</label>
+        <input class="form-input" id="registration-age" type="number" min="18" max="120" inputmode="numeric" placeholder="18 or older" />
+      </div>
+      <label class="registration-consent">
+        <input id="registration-terms" type="checkbox" />
+        <span>I confirm that I am 18 or older and agree to the Terms &amp; Conditions.</span>
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" type="button" onclick="cancelRegistrationDetails()">Cancel</button>
+      <button class="btn-primary" type="button" onclick="completeRegistration()">Create account</button>
+    </div>
+  </div>
+</div>
+
 <!-- Admin panel full screen -->
 <div id="admin-screen" class="screen hidden">
   <div class="admin-layout">
@@ -631,12 +661,6 @@
 ═══════════════════════════════════════════════════════════════════════════ -->
 <div class="notifications" id="notifications"></div>
 
-<!-- PWA Install Banner -->
-<div class="install-banner hidden" id="install-banner">
-  <span>📲 Install DHUN AI for the best experience</span>
-  <button class="btn-install" onclick="installPWA()">Install</button>
-  <button class="install-dismiss" onclick="dismissInstall()">✕</button>
-</div>
 
 <!-- Audio element -->
 <audio id="audio-player" preload="metadata"></audio>

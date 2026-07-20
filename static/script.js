@@ -31,6 +31,7 @@ const S = {
   totalPages: 1,
   installEvt: null,    // PWA BeforeInstallPromptEvent
   genCharts:  {},      // Chart.js instances
+  pendingRegistrationEmbedding: null,
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -38,7 +39,6 @@ const S = {
 // ══════════════════════════════════════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', async () => {
   registerServiceWorker();
-  watchInstallPrompt();
 
   // Auto-load model progress bar animation
   animateLoaderBar();
@@ -51,8 +51,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     const { token, faceId } = loadToken();
     if (token && faceId) {
       try {
-        await callApi('GET', '/auth/verify', null, token);
-        S.user = { token, face_id: faceId };
+        const profile = await callApi('GET', '/auth/verify', null, token);
+        S.user = { token, face_id: faceId, display_name: profile.display_name };
         enterApp();
         return;
       } catch {
@@ -81,34 +81,6 @@ function registerServiceWorker() {
   }
 }
 
-function watchInstallPrompt() {
-  window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault();
-    S.installEvt = e;
-    // Show install banner after 5s delay
-    setTimeout(() => {
-      const banner = $('install-banner');
-      if (banner && S.installEvt) banner.classList.remove('hidden');
-    }, 5000);
-  });
-  window.addEventListener('appinstalled', () => {
-    $('install-banner').classList.add('hidden');
-    S.installEvt = null;
-  });
-}
-
-window.installPWA = async () => {
-  if (!S.installEvt) return;
-  S.installEvt.prompt();
-  const { outcome } = await S.installEvt.userChoice;
-  if (outcome === 'accepted') notify('DHUN AI installed! 🎉', 'success');
-  S.installEvt = null;
-  $('install-banner').classList.add('hidden');
-};
-
-window.dismissInstall = () => {
-  $('install-banner').classList.add('hidden');
-};
 
 // ══════════════════════════════════════════════════════════════════════════════
 // LOADER
@@ -267,24 +239,49 @@ window.startRegister = async () => {
     setAuthStatus('Look at the camera and stay still…', 'info');
     const embedding = await detectFace(false); // no blink for registration
     closeCamera();
-    setAuthStatus('Processing your face…', 'info');
-
-    const res = await callApi('POST', '/auth/register', { embedding });
-
-    if (res.already_registered) {
-      saveToken(res.token, res.face_id);
-      S.user = { token: res.token, face_id: res.face_id };
-      notify('Welcome back! Auto-logged in.', 'success');
-    } else {
-      saveToken(res.token, res.face_id);
-      S.user = { token: res.token, face_id: res.face_id };
-      notify('Face registered! Welcome to DHUN AI 🎵', 'success');
-    }
-    enterApp();
+    S.pendingRegistrationEmbedding = embedding;
+    setAuthStatus('Face scan complete. Add your details to continue.', 'success');
+    openModal('registration-details-modal');
+    $('registration-name').focus();
   } catch (err) {
     closeCamera();
     setAuthStatus(err.message || 'Registration failed. Try again.', 'error');
     disableAuthButtons(false);
+  }
+};
+
+window.cancelRegistrationDetails = () => {
+  S.pendingRegistrationEmbedding = null;
+  closeModal('registration-details-modal');
+  setAuthStatus('Registration cancelled. You can scan again when ready.', 'info');
+  disableAuthButtons(false);
+};
+
+window.completeRegistration = async () => {
+  const name = $('registration-name').value.trim();
+  const age = Number($('registration-age').value);
+  const termsAccepted = $('registration-terms').checked;
+
+  if (name.length < 2) return notify('Please enter your full name.', 'error');
+  if (!Number.isInteger(age) || age < 18 || age > 120) return notify('You must be 18 or older to register.', 'error');
+  if (!termsAccepted) return notify('Please accept the Terms & Conditions to continue.', 'error');
+  if (!S.pendingRegistrationEmbedding) return notify('Your face scan expired. Please scan again.', 'error');
+
+  try {
+    const res = await callApi('POST', '/auth/register', {
+      embedding: S.pendingRegistrationEmbedding,
+      name,
+      age,
+      terms_accepted: termsAccepted,
+    });
+    closeModal('registration-details-modal');
+    S.pendingRegistrationEmbedding = null;
+    saveToken(res.token, res.face_id);
+    S.user = { token: res.token, face_id: res.face_id, display_name: res.display_name };
+    notify(res.already_registered ? `Hello, ${res.display_name}!` : `Welcome, ${res.display_name}!`, 'success');
+    enterApp();
+  } catch (err) {
+    notify(err.message || 'Registration failed. Please try again.', 'error');
   }
 };
 
@@ -300,8 +297,8 @@ window.startLogin = async () => {
 
     const res = await callApi('POST', '/auth/login', { embedding });
     saveToken(res.token, res.face_id);
-    S.user = { token: res.token, face_id: res.face_id };
-    notify('Welcome back! 🎵', 'success');
+    S.user = { token: res.token, face_id: res.face_id, display_name: res.display_name };
+    notify(`Hello, ${res.display_name || 'there'}!`, 'success');
     enterApp();
   } catch (err) {
     closeCamera();
@@ -1168,5 +1165,6 @@ document.addEventListener('keydown', e => {
   if (e.code === 'ArrowLeft')  prevSong();
   if (e.code === 'Escape') {
     ['generator-modal','lyrics-modal','expanded-player','delete-modal','admin-pin-modal'].forEach(closeModal);
+    if (!$('registration-details-modal').classList.contains('hidden')) cancelRegistrationDetails();
   }
 });

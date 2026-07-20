@@ -338,14 +338,24 @@ def register():
     try:
         data = request.get_json(force=True)
         embedding = data.get("embedding", [])
+        name = str(data.get("name", "")).strip()
+        age = data.get("age")
+        terms_accepted = data.get("terms_accepted") is True
 
         if not isinstance(embedding, list) or len(embedding) != 128:
             return jsonify({"error": "Invalid face embedding — expected 128-dimensional array"}), 400
 
+        if len(name) < 2 or len(name) > 80:
+            return jsonify({"error": "Please provide a valid full name"}), 400
+        if isinstance(age, bool) or not isinstance(age, int) or age < 18 or age > 120:
+            return jsonify({"error": "You must be 18 or older to register"}), 400
+        if not terms_accepted:
+            return jsonify({"error": "Terms acceptance is required to register"}), 400
+
         db = get_db()
 
         # Check if face already exists (prevents duplicate registrations)
-        all_users = list(db.users.find({}, {"face_embedding": 1, "face_id": 1}))
+        all_users = list(db.users.find({}, {"face_embedding": 1, "face_id": 1, "name": 1}))
         for user in all_users:
             try:
                 stored = decrypt_embedding(user["face_embedding"])
@@ -358,7 +368,7 @@ def register():
                     )
                     token = create_token(user["face_id"])
                     logger.info(f"Re-registration detected, auto-login: {user['face_id']}")
-                    return jsonify({"already_registered": True, "token": token, "face_id": user["face_id"]}), 200
+                    return jsonify({"already_registered": True, "token": token, "face_id": user["face_id"], "display_name": user.get("name", "there")}), 200
             except Exception:
                 continue
 
@@ -367,6 +377,9 @@ def register():
         user_doc = {
             "face_id": face_id,
             "face_embedding": encrypt_embedding(embedding),
+            "name": name,
+            "age": age,
+            "terms_accepted_at": datetime.utcnow(),
             "created_at": datetime.utcnow(),
             "last_login": datetime.utcnow(),
             "song_count": 0,
@@ -377,7 +390,7 @@ def register():
 
         token = create_token(face_id)
         logger.info(f"New user registered: {face_id}")
-        return jsonify({"success": True, "token": token, "face_id": face_id}), 201
+        return jsonify({"success": True, "token": token, "face_id": face_id, "display_name": name}), 201
 
     except Exception as e:
         logger.error(f"Registration error: {e}", exc_info=True)
@@ -395,7 +408,7 @@ def login():
             return jsonify({"error": "Invalid face embedding"}), 400
 
         db = get_db()
-        all_users = list(db.users.find({"is_active": {"$ne": False}}, {"face_embedding": 1, "face_id": 1}))
+        all_users = list(db.users.find({"is_active": {"$ne": False}}, {"face_embedding": 1, "face_id": 1, "name": 1}))
 
         best_user = None
         best_dist = float("inf")
@@ -423,7 +436,7 @@ def login():
             })
             token = create_token(best_user["face_id"])
             logger.info(f"User logged in: {best_user['face_id']} (dist={best_dist:.3f})")
-            return jsonify({"success": True, "token": token, "face_id": best_user["face_id"]}), 200
+            return jsonify({"success": True, "token": token, "face_id": best_user["face_id"], "display_name": best_user.get("name", "there")}), 200
 
         # Failed attempt log
         db.analytics.insert_one({
@@ -441,7 +454,8 @@ def login():
 @app.route("/api/auth/verify", methods=["GET"])
 @require_auth
 def verify_auth():
-    return jsonify({"valid": True, "face_id": request.user["face_id"]})
+    user = get_db().users.find_one({"face_id": request.user["face_id"]}, {"name": 1}) or {}
+    return jsonify({"valid": True, "face_id": request.user["face_id"], "display_name": user.get("name", "")})
 
 
 # ═════════════════════════════════════════════════════════════════════════════
