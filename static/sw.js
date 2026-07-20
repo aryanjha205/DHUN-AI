@@ -18,9 +18,9 @@ const SHELL_ASSETS = [
 
 // face-api.js models — heavy, long-lived cache
 const MODEL_URLS = [
-  'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights/tiny_face_detector_model-weights_manifest.json',
-  'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights/face_landmark_68_model-weights_manifest.json',
-  'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights/face_recognition_model-weights_manifest.json',
+  'https://vladmandic.github.io/face-api/model/tiny_face_detector_model-weights_manifest.json',
+  'https://vladmandic.github.io/face-api/model/face_landmark_68_model-weights_manifest.json',
+  'https://vladmandic.github.io/face-api/model/face_recognition_model-weights_manifest.json',
 ];
 
 // ── Install ────────────────────────────────────────────────────────────────

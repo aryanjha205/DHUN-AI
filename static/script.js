@@ -8,7 +8,7 @@
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const API = '/api';
-const FACE_MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights';
+const FACE_MODEL_URL = 'https://vladmandic.github.io/face-api/model';
 const BLINK_EAR_THRESH  = 0.24;   // Eye Aspect Ratio threshold for blink
 const FACE_DETECT_OPTS  = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
 
