@@ -896,7 +896,7 @@ async function loadAdminOverview() {
         type: 'bar',
         data: {
           labels: data.genre_stats.map(g => g._id || 'Unknown'),
-          datasets: [{ label: 'Songs', data: data.genre_stats.map(g => g.count), backgroundColor: '#8b5cf6' }],
+          datasets: [{ label: 'Songs', data: data.genre_stats.map(g => g.count), backgroundColor: '#167a45' }],
         },
         options: chartOpts('Songs by Genre'),
       });
@@ -908,7 +908,7 @@ async function loadAdminOverview() {
         type: 'line',
         data: {
           labels: data.daily_songs.map(d => d._id),
-          datasets: [{ label: 'Songs', data: data.daily_songs.map(d => d.count), borderColor: '#06b6d4', backgroundColor: 'rgba(6,182,212,.15)', fill: true, tension: 0.4 }],
+          datasets: [{ label: 'Songs', data: data.daily_songs.map(d => d.count), borderColor: '#167a45', backgroundColor: 'rgba(22,122,69,.12)', fill: true, tension: 0.4 }],
         },
         options: chartOpts('Daily Songs'),
       });
@@ -920,9 +920,9 @@ async function loadAdminOverview() {
         type: 'doughnut',
         data: {
           labels: data.mood_stats.map(m => m._id || 'Unknown'),
-          datasets: [{ data: data.mood_stats.map(m => m.count), backgroundColor: ['#8b5cf6','#06b6d4','#f59e0b','#10b981','#ef4444','#a78bfa','#ec4899','#f97316','#84cc16'], borderWidth: 0 }],
+          datasets: [{ data: data.mood_stats.map(m => m.count), backgroundColor: ['#167a45','#39a96b','#92c95a','#f0b429','#d95d39','#be6a9b','#5171a5','#73a6ad','#9aa56a'], borderWidth: 0 }],
         },
-        options: { ...chartOpts('Moods'), plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 } } } } },
+        options: { ...chartOpts('Moods'), plugins: { legend: { position: 'bottom', labels: { color: '#66756b', font: { size: 11 } } } } },
       });
     }
 
@@ -946,8 +946,8 @@ function chartOpts(label) {
     responsive: true,
     plugins: { legend: { display: false }, title: { display: false } },
     scales: {
-      x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.06)' } },
-      y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.06)' } },
+      x: { ticks: { color: '#66756b', font: { size: 10 } }, grid: { color: 'rgba(22,122,69,.08)' } },
+      y: { ticks: { color: '#66756b', font: { size: 10 } }, grid: { color: 'rgba(22,122,69,.08)' } },
     },
   };
 }

@@ -492,14 +492,14 @@
   <div class="admin-layout">
     <aside class="admin-sidebar">
       <div class="admin-sidebar-header">
-        <span>🛡️</span> Admin Panel
+        <span aria-hidden="true">🛡️</span> Admin Panel
       </div>
       <nav class="admin-nav">
-        <button class="admin-nav-item active" data-tab="overview" onclick="switchAdminTab('overview')">📊 Overview</button>
-        <button class="admin-nav-item" data-tab="users" onclick="switchAdminTab('users')">👥 Users</button>
-        <button class="admin-nav-item" data-tab="songs" onclick="switchAdminTab('songs')">🎵 Songs</button>
+        <button class="admin-nav-item active" data-tab="overview" onclick="switchAdminTab('overview')">📈 Overview</button>
+        <button class="admin-nav-item" data-tab="users" onclick="switchAdminTab('users')">👤 Users</button>
+        <button class="admin-nav-item" data-tab="songs" onclick="switchAdminTab('songs')">🎼 Songs</button>
         <button class="admin-nav-item" data-tab="settings" onclick="switchAdminTab('settings')">⚙️ Settings</button>
-        <button class="admin-nav-item" data-tab="logs" onclick="switchAdminTab('logs')">📋 Logs</button>
+        <button class="admin-nav-item" data-tab="logs" onclick="switchAdminTab('logs')">🧾 Logs</button>
       </nav>
       <button class="admin-back" onclick="exitAdmin()">← Back to App</button>
     </aside>
@@ -507,20 +507,20 @@
     <main class="admin-main">
       <!-- Overview Tab -->
       <div class="admin-tab active" id="admin-tab-overview">
-        <h2 class="admin-page-title">📊 Overview</h2>
+        <h2 class="admin-page-title">📈 Overview</h2>
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="stat-icon">👥</div>
+            <div class="stat-icon" aria-label="Users">👤</div>
             <div class="stat-val" id="stat-users">—</div>
             <div class="stat-label">Total Users</div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon">🎵</div>
+            <div class="stat-icon" aria-label="Songs">🎼</div>
             <div class="stat-val" id="stat-songs">—</div>
             <div class="stat-label">Total Songs</div>
           </div>
           <div class="stat-card">
-            <div class="stat-icon">▶</div>
+            <div class="stat-icon" aria-label="Plays">▶️</div>
             <div class="stat-val" id="stat-plays">—</div>
             <div class="stat-label">Total Plays</div>
           </div>
@@ -543,7 +543,7 @@
 
       <!-- Users Tab -->
       <div class="admin-tab" id="admin-tab-users">
-        <h2 class="admin-page-title">👥 Users</h2>
+        <h2 class="admin-page-title">👤 Users</h2>
         <div class="admin-table-wrap">
           <table class="admin-table" id="users-table">
             <thead>
@@ -564,7 +564,7 @@
 
       <!-- Songs Tab -->
       <div class="admin-tab" id="admin-tab-songs">
-        <h2 class="admin-page-title">🎵 All Songs</h2>
+        <h2 class="admin-page-title">🎼 All Songs</h2>
         <div class="admin-table-wrap">
           <table class="admin-table">
             <thead>
@@ -617,7 +617,7 @@
 
       <!-- Logs Tab -->
       <div class="admin-tab" id="admin-tab-logs">
-        <h2 class="admin-page-title">📋 Recent Events</h2>
+        <h2 class="admin-page-title">🧾 Recent Events</h2>
         <div class="logs-list" id="logs-list">
           <p class="loading-row">Loading logs…</p>
         </div>
