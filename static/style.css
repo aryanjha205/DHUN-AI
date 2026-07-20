@@ -5,29 +5,29 @@
 
 /* ── Design Tokens ─────────────────────────────────────────────────────── */
 :root {
-  --bg:          #030308;
-  --bg-2:        #0c0c1a;
-  --bg-3:        #12122a;
-  --surface:     rgba(255,255,255,0.04);
-  --surface-h:   rgba(255,255,255,0.08);
-  --surface-a:   rgba(255,255,255,0.12);
-  --border:      rgba(255,255,255,0.08);
-  --border-h:    rgba(255,255,255,0.16);
+  --bg:          #f8fafc;
+  --bg-2:        #ffffff;
+  --bg-3:        #f1f5f9;
+  --surface:     #ffffff;
+  --surface-h:   #f1f5f9;
+  --surface-a:   #e2e8f0;
+  --border:      #e2e8f0;
+  --border-h:    #cbd5e1;
 
-  --primary:     #8b5cf6;
-  --primary-d:   #7c3aed;
-  --primary-l:   #a78bfa;
-  --primary-glow:rgba(139,92,246,0.35);
-  --secondary:   #06b6d4;
-  --accent:      #f59e0b;
+  --primary:     #1e3a8a;
+  --primary-d:   #172554;
+  --primary-l:   #3b82f6;
+  --primary-glow:rgba(30,58,138,0.15);
+  --secondary:   #ef4444;
+  --accent:      #dc2626;
   --success:     #10b981;
   --error:       #ef4444;
   --warning:     #f59e0b;
 
-  --text:        #f8fafc;
-  --text-2:      #cbd5e1;
-  --text-3:      #94a3b8;
-  --text-4:      #475569;
+  --text:        #0f172a;
+  --text-2:      #334155;
+  --text-3:      #475569;
+  --text-4:      #64748b;
 
   --radius-sm:   8px;
   --radius:      14px;
@@ -35,11 +35,11 @@
   --radius-xl:   28px;
   --radius-full: 9999px;
 
-  --glass-bg:    rgba(13,13,30,0.72);
+  --glass-bg:    rgba(255,255,255,0.85);
   --glass-blur:  backdrop-filter: blur(24px) saturate(180%);
-  --shadow-sm:   0 2px 8px rgba(0,0,0,.5);
-  --shadow:      0 8px 32px rgba(0,0,0,.6);
-  --shadow-lg:   0 24px 64px rgba(0,0,0,.8);
+  --shadow-sm:   0 2px 8px rgba(15,23,42,.05);
+  --shadow:      0 8px 32px rgba(15,23,42,.08);
+  --shadow-lg:   0 24px 64px rgba(15,23,42,.12);
   --glow:        0 0 40px var(--primary-glow);
 
   --sidebar-w:   240px;
@@ -159,12 +159,12 @@ input, select, textarea { font-family: inherit; }
 .auth-bg { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .auth-orb {
   position: absolute; border-radius: 50%;
-  filter: blur(80px); opacity: 0.25;
+  filter: blur(100px); opacity: 0.15;
   animation: orbFloat 8s ease-in-out infinite;
 }
-.auth-orb-1 { width: 500px; height: 500px; background: var(--primary); top: -200px; left: -150px; animation-delay: 0s; }
+.auth-orb-1 { width: 500px; height: 500px; background: var(--primary-l); top: -200px; left: -150px; animation-delay: 0s; }
 .auth-orb-2 { width: 400px; height: 400px; background: var(--secondary); bottom: -150px; right: -100px; animation-delay: -3s; }
-.auth-orb-3 { width: 300px; height: 300px; background: var(--accent); top: 50%; left: 50%; transform: translate(-50%,-50%); animation-delay: -5s; opacity: .12; }
+.auth-orb-3 { width: 300px; height: 300px; background: var(--primary); top: 50%; left: 50%; transform: translate(-50%,-50%); animation-delay: -5s; opacity: .08; }
 @keyframes orbFloat {
   0%,100% { transform: translate(0,0) scale(1); }
   33%      { transform: translate(30px,-20px) scale(1.05); }
@@ -210,7 +210,7 @@ input, select, textarea { font-family: inherit; }
 }
 #camera-video {
   position: relative; z-index: 1;
-  width: 100%; height: 100%; object-fit: cover; background: #11131a;
+  width: 100%; height: 100%; object-fit: cover; background: #f1f5f9;
   transform: scaleX(-1); /* Mirror */
   border-radius: 50%;
 }
@@ -219,8 +219,8 @@ input, select, textarea { font-family: inherit; }
   position: absolute; z-index: 3; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: .5rem;
   border-radius: 50%;
-  background: rgba(3,3,8,.8);
-  font-size: .85rem; color: var(--text-3);
+  background: rgba(255,255,255,.8);
+  font-size: .85rem; color: var(--text-2);
   transition: opacity var(--transition);
 }
 .camera-overlay-text .status-icon { font-size: 2.5rem; }
