@@ -25,7 +25,7 @@ DELETE /api/songs/<id>          Soft-delete song
 POST /api/songs/<id>/play       Increment play count
 """
 
-import os, sys, uuid, json, base64, hashlib, logging, requests
+import os, sys, uuid, json, base64, hashlib, logging, requests, math, struct, random, urllib.parse
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -185,35 +185,77 @@ def ai_generate_lyrics(prompt: str, genre: str, mood: str, language: str, durati
     system_msg = (
         "You are a Grammy-winning professional songwriter and music producer. "
         "Generate complete, emotionally powerful song lyrics with multiple verses, "
-        "a memorable chorus, and a bridge. Return ONLY valid JSON."
+        "a memorable chorus, and a bridge. Return ONLY valid JSON, with no other text."
     )
     user_msg = (
         f"Write a {duration} {genre} song with a {mood} mood in {language}.\n"
         f"Theme / inspiration: {prompt}\n\n"
         'Return JSON exactly like: {"title": "...", "lyrics": "...", "structure": "verse-chorus-verse-chorus-bridge-chorus"}'
     )
-    resp = requests.post(
-        f"{config.OPENROUTER_BASE}/chat/completions",
-        headers=_or_headers(),
-        json={
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_msg},
-                {"role": "user", "content": user_msg},
-            ],
-            "response_format": {"type": "json_object"},
-            "temperature": 0.85,
-            "max_tokens": 1500,
-        },
-        timeout=90,
-    )
-    resp.raise_for_status()
-    raw = resp.json()["choices"][0]["message"]["content"]
-    return json.loads(raw)
+    
+    json_payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": user_msg},
+        ],
+        "temperature": 0.85,
+        "max_tokens": 1500,
+    }
+    
+    # Only use response_format if not a free model to avoid API error
+    if "free" not in model.lower():
+        json_payload["response_format"] = {"type": "json_object"}
+        
+    try:
+        resp = requests.post(
+            f"{config.OPENROUTER_BASE}/chat/completions",
+            headers=_or_headers(),
+            json=json_payload,
+            timeout=90,
+        )
+        resp.raise_for_status()
+        raw = resp.json()["choices"][0]["message"]["content"].strip()
+        
+        # Robust parsing to find JSON boundaries
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            start = raw.find("{")
+            end = raw.rfind("}")
+            if start != -1 and end != -1:
+                return json.loads(raw[start:end+1])
+            raise
+    except Exception as e:
+        logger.warning(f"Lyrics AI failed: {e}. Retrying without response_format...")
+        if "response_format" in json_payload:
+            del json_payload["response_format"]
+            try:
+                resp = requests.post(
+                    f"{config.OPENROUTER_BASE}/chat/completions",
+                    headers=_or_headers(),
+                    json=json_payload,
+                    timeout=90,
+                )
+                resp.raise_for_status()
+                raw = resp.json()["choices"][0]["message"]["content"].strip()
+                start = raw.find("{")
+                end = raw.rfind("}")
+                if start != -1 and end != -1:
+                    return json.loads(raw[start:end+1])
+                return json.loads(raw)
+            except Exception as inner_e:
+                logger.error(f"Fallback lyrics generation failed: {inner_e}")
+                raise inner_e
+        raise e
 
 
 def ai_generate_cover(title: str, genre: str, mood: str, prompt: str, model: str) -> str | None:
-    """Generate album cover art via OpenRouter images endpoint."""
+    """Generate album cover art via Pollinations AI or OpenRouter images endpoint."""
+    if model == "pollinations":
+        encoded_prompt = urllib.parse.quote(f"album cover art, {genre}, {mood}, {title}, {prompt[:100]}")
+        return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=512&height=512&nologo=true"
+
     image_prompt = (
         f"Professional album cover art for a {genre} song titled '{title}'. "
         f"Mood: {mood}. Inspired by: {prompt[:120]}. "
@@ -292,6 +334,208 @@ def ai_generate_audio(title: str, lyrics: str, genre: str, mood: str, model: str
     return result
 
 
+# ── Procedural Audio Synthesizer ──────────────────────────────────────────────
+BPM_MAP = {
+    "Pop": 120,
+    "Rock": 115,
+    "Hip-Hop": 92,
+    "Jazz": 85,
+    "Electronic": 128,
+    "Classical": 75,
+    "R&B": 88,
+    "Indie": 105,
+    "Folk": 95,
+    "Bollywood": 115
+}
+
+PROGRESSIONS = {
+    "Happy": ["C", "G", "Am", "F"],
+    "Sad": ["Am", "F", "C", "G"],
+    "Romantic": ["C", "Am", "F", "G"],
+    "Energetic": ["Am", "G", "F", "Em"],
+    "Melancholic": ["Am", "Dm", "C", "G"],
+    "Peaceful": ["C", "F", "C", "G"],
+    "Dark": ["Am", "F", "Dm", "E"],
+    "Uplifting": ["C", "G", "Am", "F"],
+    "Nostalgic": ["Am", "G", "C", "F"]
+}
+
+def get_chord_notes(chord_name):
+    chords = {
+        "C": [261.63, 329.63, 392.00],       # C4, E4, G4
+        "G": [196.00, 246.94, 293.66],       # G3, B3, D4
+        "Am": [220.00, 261.63, 329.63],      # A3, C4, E4
+        "F": [174.61, 220.00, 261.63],       # F3, A3, C4
+        "Dm": [293.66, 349.23, 440.00],      # D4, F4, A4
+        "E": [329.63, 415.30, 493.88],       # E4, G#4, B4
+        "Em": [329.63, 392.00, 493.88],      # E4, G4, B4
+    }
+    return chords.get(chord_name, [261.63, 329.63, 392.00])
+
+def get_bass_note(chord_name):
+    bass = {
+        "C": 65.41,
+        "G": 98.00,
+        "Am": 110.00,
+        "F": 87.31,
+        "Dm": 73.42,
+        "E": 82.41,
+        "Em": 82.41,
+    }
+    return bass.get(chord_name, 65.41)
+
+def add_synth_note(mixed, start_sample, duration_samples, frequency, amplitude, wave_type, sample_rate):
+    for i in range(duration_samples):
+        idx = start_sample + i
+        if idx >= len(mixed):
+            break
+        t = i / sample_rate
+        if wave_type == 'sine':
+            val = math.sin(2 * math.pi * frequency * t)
+        elif wave_type == 'square':
+            val = 1.0 if math.sin(2 * math.pi * frequency * t) >= 0 else -1.0
+        elif wave_type == 'triangle':
+            val = 2.0 * abs(2.0 * (t * frequency - math.floor(t * frequency + 0.5))) - 1.0
+        elif wave_type == 'sawtooth':
+            val = 2.0 * (t * frequency - math.floor(t * frequency + 0.5))
+        else:
+            val = 0.0
+            
+        attack = min(int(0.015 * sample_rate), duration_samples // 4)
+        release = min(int(0.06 * sample_rate), duration_samples // 3)
+        if i < attack:
+            env = i / attack
+        elif i > duration_samples - release:
+            env = max(0.0, (duration_samples - i) / release)
+        else:
+            env = 1.0
+            
+        mixed[idx] += val * amplitude * env
+
+def add_kick(mixed, start_sample, sample_rate):
+    dur_sec = 0.12
+    dur_samples = int(sample_rate * dur_sec)
+    for i in range(dur_samples):
+        idx = start_sample + i
+        if idx >= len(mixed):
+            break
+        t = i / sample_rate
+        freq = 150 - 110 * (t / dur_sec)
+        val = math.sin(2 * math.pi * freq * t)
+        decay = math.exp(-12 * t)
+        mixed[idx] += val * 0.45 * decay
+
+def add_snare(mixed, start_sample, sample_rate):
+    dur_sec = 0.18
+    dur_samples = int(sample_rate * dur_sec)
+    for i in range(dur_samples):
+        idx = start_sample + i
+        if idx >= len(mixed):
+            break
+        t = i / sample_rate
+        noise = random.uniform(-1, 1) * 0.7
+        tone = math.sin(2 * math.pi * 180 * t) * 0.3
+        decay = math.exp(-14 * t)
+        mixed[idx] += (noise + tone) * 0.28 * decay
+
+def add_hihat(mixed, start_sample, sample_rate):
+    dur_sec = 0.04
+    dur_samples = int(sample_rate * dur_sec)
+    for i in range(dur_samples):
+        idx = start_sample + i
+        if idx >= len(mixed):
+            break
+        t = i / sample_rate
+        noise = random.uniform(-1, 1)
+        decay = math.exp(-60 * t)
+        mixed[idx] += noise * 0.12 * decay
+
+def normalize_and_pack(samples):
+    max_val = max(abs(x) for x in samples) if samples else 0
+    scale = 0.95 / max_val if max_val > 1e-5 else 1.0
+    packed = bytearray()
+    for s in samples:
+        val = int(s * scale * 32767)
+        val = max(-32768, min(32767, val))
+        packed.extend(struct.pack('<h', val))
+    return packed
+
+def make_wav_header(num_samples, sample_rate, num_channels=1, bits_per_sample=16):
+    byte_rate = sample_rate * num_channels * (bits_per_sample // 8)
+    block_align = num_channels * (bits_per_sample // 8)
+    data_size = num_samples * block_align
+    file_size = 36 + data_size
+    header = struct.pack('<4sI4s', b'RIFF', file_size, b'WAVE')
+    fmt_chunk = struct.pack('<4sIHHIIHH', b'fmt ', 16, 1, num_channels, sample_rate, byte_rate, block_align, bits_per_sample)
+    data_chunk = struct.pack('<4sI', b'data', data_size)
+    return header + fmt_chunk + data_chunk
+
+def generate_procedural_wav(genre: str, mood: str, title: str) -> bytes:
+    sample_rate = 22050
+    bpm = BPM_MAP.get(genre, 110)
+    prog = PROGRESSIONS.get(mood, ["C", "G", "Am", "F"])
+    measures = prog * 2
+    steps_per_measure = 16
+    total_steps = len(measures) * steps_per_measure
+    step_duration = 60.0 / (bpm * 4)
+    total_duration = step_duration * total_steps
+    total_samples = int(sample_rate * total_duration)
+    mixed = [0.0] * total_samples
+    seed = int(hashlib.md5(title.encode()).hexdigest(), 16) % 1000000
+    rng = random.Random(seed)
+    for m_idx, chord in enumerate(measures):
+        measure_start_step = m_idx * steps_per_measure
+        measure_start_sample = int(measure_start_step * step_duration * sample_rate)
+        chord_notes = get_chord_notes(chord)
+        bass_note = get_bass_note(chord)
+        for step in range(steps_per_measure):
+            step_idx = measure_start_step + step
+            step_start_sample = int(step_idx * step_duration * sample_rate)
+            step_samples = int(step_duration * sample_rate)
+            if genre in ["Electronic", "Pop", "Bollywood"]:
+                if step in [0, 4, 8, 12]:
+                    add_kick(mixed, step_start_sample, sample_rate)
+                if step in [4, 12]:
+                    add_snare(mixed, step_start_sample, sample_rate)
+                if step in [2, 6, 10, 14]:
+                    add_hihat(mixed, step_start_sample, sample_rate)
+            elif genre in ["Hip-Hop", "R&B"]:
+                if step in [0, 8, 10]:
+                    add_kick(mixed, step_start_sample, sample_rate)
+                if step in [4, 12]:
+                    add_snare(mixed, step_start_sample, sample_rate)
+                if step in [2, 6, 10, 14]:
+                    add_hihat(mixed, step_start_sample, sample_rate)
+            else:
+                if step in [0, 8]:
+                    add_kick(mixed, step_start_sample, sample_rate)
+                if step in [4, 12]:
+                    add_snare(mixed, step_start_sample, sample_rate)
+                if step in [0, 2, 4, 6, 8, 10, 12, 14]:
+                    add_hihat(mixed, step_start_sample, sample_rate)
+            if step in [0, 4, 8, 12]:
+                bass_dur = int(step_samples * 2.5)
+                add_synth_note(mixed, step_start_sample, bass_dur, bass_note, 0.22, "triangle", sample_rate)
+            if step in [0, 8]:
+                pad_dur = int(step_samples * 6)
+                for note in chord_notes:
+                    add_synth_note(mixed, step_start_sample, pad_dur, note, 0.08, "sine", sample_rate)
+            if step in [0, 3, 6, 8, 11, 14]:
+                if rng.random() < 0.75:
+                    melody_dur = int(step_samples * 1.5)
+                    chord_note = rng.choice(chord_notes)
+                    melody_note = chord_note * (2 if rng.random() < 0.6 else 1)
+                    wave_type = "sine"
+                    if genre == "Electronic":
+                        wave_type = "sawtooth" if rng.random() < 0.3 else "sine"
+                    elif genre in ["Rock", "Indie"]:
+                        wave_type = "triangle"
+                    add_synth_note(mixed, step_start_sample, melody_dur, melody_note, 0.15, wave_type, sample_rate)
+    packed_data = normalize_and_pack(mixed)
+    header = make_wav_header(len(mixed), sample_rate)
+    return bytes(header + packed_data)
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 #  ROUTES
 # ═════════════════════════════════════════════════════════════════════════════
@@ -326,6 +570,50 @@ def health():
     except Exception as e:
         db_status = f"error: {e}"
     return jsonify({"status": "ok", "app": "DHUN AI", "version": "1.0.0", "db": db_status})
+
+
+# ── Audio Serving ─────────────────────────────────────────────────────────────
+@app.route("/api/songs/<song_id>/audio", methods=["GET"])
+def serve_song_audio(song_id):
+    """Serve the song audio from MongoDB decodable from base64."""
+    try:
+        db = get_db()
+        song = db.songs.find_one({"song_id": song_id, "is_deleted": {"$ne": True}})
+        if not song:
+            return jsonify({"error": "Song not found"}), 404
+            
+        audio_b64 = song.get("audio_b64")
+        if not audio_b64:
+            return jsonify({"error": "Audio data not found for this song"}), 404
+            
+        # Extract binary data from base64 string
+        if audio_b64.startswith("data:audio/"):
+            parts = audio_b64.split(",", 1)
+            if len(parts) == 2:
+                mime_type = parts[0].split(";")[0].replace("data:", "")
+                b64_data = parts[1]
+            else:
+                mime_type = "audio/wav"
+                b64_data = audio_b64
+        else:
+            mime_type = "audio/wav"
+            b64_data = audio_b64
+            
+        audio_bytes = base64.b64decode(b64_data)
+        
+        response = app.response_class(audio_bytes, mimetype=mime_type)
+        
+        # If download parameter is provided, trigger attachment download
+        if request.args.get("download") == "1":
+            title = song.get("title", "song").replace('"', '\\"')
+            ext = "wav" if "wav" in mime_type else "mp3"
+            response.headers["Content-Disposition"] = f'attachment; filename="{title}.{ext}"'
+            
+        response.headers["Accept-Ranges"] = "bytes"
+        return response
+    except Exception as e:
+        logger.error(f"Serve audio error for song {song_id}: {e}", exc_info=True)
+        return jsonify({"error": "Failed to serve audio", "detail": str(e)}), 500
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -560,7 +848,13 @@ def admin_list_songs():
             .skip((page - 1) * limit)
             .limit(limit)
         )
-        return jsonify({"songs": [serialize_doc(s) for s in songs], "total": total, "page": page})
+        serialized_songs = []
+        for s in songs:
+            s_doc = serialize_doc(s)
+            if s_doc:
+                s_doc["audio_url"] = f"/api/songs/{s_doc['song_id']}/audio"
+                serialized_songs.append(s_doc)
+        return jsonify({"songs": serialized_songs, "total": total, "page": page})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -652,7 +946,22 @@ def generate_song():
         cover_url = ai_generate_cover(title, genre, mood, prompt, models["cover"])
 
         # ── Step 3: Audio ─────────────────────────────────────────────
-        audio_result = ai_generate_audio(title, lyrics, genre, mood, models["audio"])
+        audio_result = {"audio_url": None, "audio_b64": None}
+        if models["audio"] != "procedural":
+            try:
+                audio_result = ai_generate_audio(title, lyrics, genre, mood, models["audio"])
+            except Exception as e:
+                logger.warning(f"Audio generation failed: {e}. Falling back to procedural.")
+
+        # Fallback to procedural if no audio generated
+        if not audio_result.get("audio_b64") and not audio_result.get("audio_url"):
+            try:
+                logger.info(f"Generating procedural audio for: {title}")
+                wav_bytes = generate_procedural_wav(genre, mood, title)
+                audio_result["audio_b64"] = "data:audio/wav;base64," + base64.b64encode(wav_bytes).decode("utf-8")
+                audio_result["audio_url"] = f"/api/songs/{song_id}/audio"
+            except Exception as e:
+                logger.error(f"Procedural audio generation failed: {e}", exc_info=True)
 
         # ── Save to MongoDB ───────────────────────────────────────────
         song_doc = {
@@ -666,7 +975,7 @@ def generate_song():
             "language": language,
             "duration": duration,
             "cover_url": cover_url,
-            "audio_url": audio_result.get("audio_url"),
+            "audio_url": f"/api/songs/{song_id}/audio" if audio_result.get("audio_b64") else audio_result.get("audio_url"),
             "audio_b64": audio_result.get("audio_b64"),  # stored but not returned in list
             "user_face_id": face_id,
             "created_at": datetime.utcnow(),
@@ -737,9 +1046,15 @@ def get_user_songs():
             .skip((page - 1) * limit)
             .limit(limit)
         )
+        serialized_songs = []
+        for s in songs:
+            s_doc = serialize_doc(s)
+            if s_doc:
+                s_doc["audio_url"] = f"/api/songs/{s_doc['song_id']}/audio"
+                serialized_songs.append(s_doc)
 
         return jsonify({
-            "songs": [serialize_doc(s) for s in songs],
+            "songs": serialized_songs,
             "total": total,
             "page": page,
             "pages": max(1, (total + limit - 1) // limit),

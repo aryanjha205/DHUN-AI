@@ -829,8 +829,9 @@ window.downloadSong = (songId) => {
 
   if (song.audio_url) {
     const a = document.createElement('a');
-    a.href = song.audio_url;
-    a.download = `${song.title}.mp3`;
+    const isLocal = song.audio_url.startsWith('/');
+    a.href = isLocal ? (song.audio_url + '?download=1') : song.audio_url;
+    a.download = `${song.title}.${isLocal ? 'wav' : 'mp3'}`;
     a.target = '_blank';
     a.click();
   } else {

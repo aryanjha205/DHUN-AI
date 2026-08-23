@@ -30,9 +30,9 @@ class Config:
     OPENROUTER_TITLE: str = "DHUN AI Music Generator"
 
     # AI models (overridable from admin panel)
-    LYRICS_MODEL: str = os.environ.get("LYRICS_MODEL", "openai/gpt-4o-mini")
-    COVER_MODEL: str = os.environ.get("COVER_MODEL", "black-forest-labs/flux-schnell")
-    AUDIO_MODEL: str = os.environ.get("AUDIO_MODEL", "google/lyria-2")
+    LYRICS_MODEL: str = os.environ.get("LYRICS_MODEL", "openrouter/free")
+    COVER_MODEL: str = os.environ.get("COVER_MODEL", "pollinations")
+    AUDIO_MODEL: str = os.environ.get("AUDIO_MODEL", "procedural")
 
     # ── Encryption ────────────────────────────────────────────────────
     @staticmethod
