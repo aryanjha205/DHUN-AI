@@ -660,9 +660,9 @@ def generate_suno_song(prompt, genre, mood, lyrics, title, cookie_str, vocal_typ
 
 
 # ── Hugging Face MusicGen Generator ───────────────────────────────────────────
-def generate_musicgen_audio(prompt: str, genre: str, mood: str, duration: str = "15 seconds") -> bytes:
+def generate_musicgen_audio(prompt: str, genre: str, mood: str, duration: str = "15 seconds", space: str = "facebook/MusicGen") -> bytes:
     from gradio_client import Client
-    logger.info("Initializing Gradio Client for Hugging Face Space: facebook/MusicGen...")
+    logger.info(f"Initializing Gradio Client for Hugging Face Space: {space}...")
     try:
         # Convert duration to seconds, default to 15s, cap at 30s
         duration_sec = 15
@@ -677,7 +677,7 @@ def generate_musicgen_audio(prompt: str, genre: str, mood: str, duration: str = 
                 duration_sec = 15
         duration_sec = min(30, max(5, duration_sec))
 
-        client = Client("facebook/MusicGen")
+        client = Client(space)
         full_prompt = f"{genre} music, {mood} mood, {prompt}"
         
         logger.info(f"Submitting prediction to MusicGen: '{full_prompt}' for {duration_sec}s...")
@@ -1130,21 +1130,42 @@ def generate_song():
         
         # Tier 2: Hugging Face MusicGen
         if not audio_bytes:
-            logger.info("Attempting Hugging Face MusicGen generation...")
-            try:
-                musicgen_prompt = prompt
-                if vocal_type == "instrumental":
-                    musicgen_prompt += ", instrumental"
-                elif vocal_type == "female":
-                    musicgen_prompt += ", female singer voice"
-                elif vocal_type == "male":
-                    musicgen_prompt += ", male singer voice"
-                elif vocal_type == "duet":
-                    musicgen_prompt += ", duet male female singer voices"
-                audio_bytes = generate_musicgen_audio(musicgen_prompt, genre, mood, duration)
-                logger.info("Successfully generated audio via Hugging Face MusicGen!")
-            except Exception as e:
-                logger.warning(f"MusicGen generation failed: {e}. Falling back to procedural synthesizer...")
+            # Steer prompt for Bollywood style if Bollywood is selected or mentioned
+            steered_prompt = prompt
+            if genre.lower() == "bollywood" or "bollywood" in prompt.lower() or "hindi" in prompt.lower():
+                bollywood_keywords = "bollywood cinematic soundtrack, rich tabla, dholak rhythm, sweet sitar, bansuri flute melody, hindi film style"
+                steered_prompt = f"{prompt}, {bollywood_keywords}"
+
+            musicgen_prompt = steered_prompt
+            if vocal_type == "instrumental":
+                musicgen_prompt += ", instrumental"
+            elif vocal_type == "female":
+                musicgen_prompt += ", female singer voice, hindi vocals"
+            elif vocal_type == "male":
+                musicgen_prompt += ", male singer voice, hindi vocals"
+            elif vocal_type == "duet":
+                musicgen_prompt += ", duet male female singer voices, hindi vocals"
+
+            # Pool of multiple free, keyless Hugging Face space endpoints for redundancy
+            MUSICGEN_SPACES = [
+                "facebook/MusicGen",
+                "grandcolline/MusicGen",
+                "JacobLinCool/MusicGen",
+                "fffiloni/MusicGen-songplay"
+            ]
+
+            for space in MUSICGEN_SPACES:
+                logger.info(f"Attempting Hugging Face MusicGen generation via space: {space}...")
+                try:
+                    audio_bytes = generate_musicgen_audio(musicgen_prompt, genre, mood, duration, space=space)
+                    if audio_bytes:
+                        logger.info(f"Successfully generated audio via Hugging Face Space: {space}!")
+                        break
+                except Exception as space_err:
+                    logger.warning(f"MusicGen space {space} failed: {space_err}. Trying next space...")
+            
+            if not audio_bytes:
+                logger.warning("All Hugging Face MusicGen spaces failed. Falling back to procedural synthesizer...")
                 
         # Tier 3: Local Procedural Synthesizer (guaranteed fallback)
         if not audio_bytes:
