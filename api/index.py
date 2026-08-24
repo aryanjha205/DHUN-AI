@@ -177,6 +177,7 @@ def _get_live_models(db) -> dict:
         "lyrics": settings.get("lyrics_model", config.LYRICS_MODEL),
         "cover": settings.get("cover_model", config.COVER_MODEL),
         "audio": settings.get("audio_model", config.AUDIO_MODEL),
+        "suno_cookie": settings.get("suno_cookie", config.SUNO_COOKIE),
     }
 
 
@@ -536,6 +537,161 @@ def generate_procedural_wav(genre: str, mood: str, title: str) -> bytes:
     return bytes(header + packed_data)
 
 
+# ── Suno.com Music Generator ──────────────────────────────────────────────────
+def generate_suno_song(prompt, genre, mood, lyrics, title, cookie_str):
+    import requests
+    import time
+    
+    headers = {
+        "Cookie": cookie_str,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Origin": "https://suno.com",
+        "Referer": "https://suno.com/",
+        "Content-Type": "application/json"
+    }
+    
+    # ── Step 1: Clerk Token Exchange ──────────────────────────────────────────
+    logger.info("Attempting Clerk token exchange for Suno...")
+    try:
+        resp = requests.get("https://clerk.suno.com/v1/client?_clerk_js_version=4.73.2", headers=headers, timeout=15)
+        resp.raise_for_status()
+        client_data = resp.json()
+        
+        response_obj = client_data.get("response", {})
+        session_id = response_obj.get("last_active_session_id")
+        if not session_id:
+            sessions = response_obj.get("client", {}).get("sessions", [])
+            if sessions:
+                session_id = sessions[0].get("id")
+                
+        if not session_id:
+            raise Exception("No active Suno session found. Make sure you are logged into suno.com and copied the full cookie.")
+            
+        logger.info(f"Active session found: {session_id}")
+        
+        token_url = f"https://clerk.suno.com/v1/client/sessions/{session_id}/tokens?_clerk_js_version=4.73.2"
+        resp2 = requests.post(token_url, headers=headers, timeout=15)
+        resp2.raise_for_status()
+        token_data = resp2.json()
+        jwt_token = token_data.get("jwt")
+        if not jwt_token:
+            jwt_token = token_data.get("response", {}).get("jwt")
+            
+        if not jwt_token:
+            raise Exception("Failed to retrieve JWT token from Clerk.")
+            
+        logger.info("Successfully obtained Suno JWT token.")
+    except Exception as e:
+        logger.error(f"Clerk token exchange failed: {e}", exc_info=True)
+        raise Exception(f"Suno Authentication failed: {e}")
+
+    # ── Step 2: Custom Song Generation ───────────────────────────────────────
+    logger.info("Sending generation request to Suno...")
+    studio_headers = {
+        "Authorization": f"Bearer {jwt_token}",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Origin": "https://suno.com",
+        "Referer": "https://suno.com/"
+    }
+    
+    payload = {
+        "prompt": lyrics[:3000] if lyrics else prompt,
+        "tags": f"{genre.lower()}, {mood.lower()}",
+        "title": title or f"My {genre} Song",
+        "make_instrumental": False,
+        "mv": "chirp-v3-5"
+    }
+    
+    gen_resp = requests.post("https://studio-api.suno.ai/api/generate/v2/", headers=studio_headers, json=payload, timeout=20)
+    gen_resp.raise_for_status()
+    gen_data = gen_resp.json()
+    
+    clips = gen_data.get("clips", [])
+    if not clips:
+        raise Exception("Suno API did not return any audio clips. Check your credit balance.")
+        
+    clip_id = clips[0].get("id")
+    logger.info(f"Suno generation started. Clip ID: {clip_id}")
+    
+    # ── Step 3: Poll until ready ─────────────────────────────────────────────
+    poll_start = time.time()
+    audio_url = None
+    while time.time() - poll_start < 90:
+        logger.info(f"Polling Suno clip {clip_id[:8]} status...")
+        try:
+            feed_resp = requests.get(f"https://studio-api.suno.ai/api/feed/?ids={clip_id}", headers=studio_headers, timeout=15)
+            feed_resp.raise_for_status()
+            feed_clips = feed_resp.json()
+            if isinstance(feed_clips, list) and len(feed_clips) > 0:
+                clip = feed_clips[0]
+                status = clip.get("status")
+                logger.info(f"Clip {clip_id[:8]} status: {status}")
+                if status == "complete":
+                    audio_url = clip.get("audio_url")
+                    break
+                elif status == "error":
+                    raise Exception("Suno generation failed with error status.")
+            time.sleep(4)
+        except Exception as poll_e:
+            logger.warning(f"Error polling clip: {poll_e}")
+            time.sleep(4)
+            
+    if not audio_url:
+        raise Exception("Suno song generation timed out after 90 seconds.")
+        
+    logger.info(f"Suno clip is ready! Downloading from: {audio_url}")
+    
+    # ── Step 4: Download and return bytes ────────────────────────────────────
+    audio_get = requests.get(audio_url, timeout=30)
+    audio_get.raise_for_status()
+    return audio_get.content
+
+
+# ── Hugging Face MusicGen Generator ───────────────────────────────────────────
+def generate_musicgen_audio(prompt: str, genre: str, mood: str, duration: str = "15 seconds") -> bytes:
+    from gradio_client import Client
+    logger.info("Initializing Gradio Client for Hugging Face Space: facebook/MusicGen...")
+    try:
+        # Convert duration to seconds, default to 15s, cap at 30s
+        duration_sec = 15
+        if duration:
+            try:
+                num = int(''.join(filter(str.isdigit, duration)))
+                if "min" in duration:
+                    duration_sec = num * 60
+                else:
+                    duration_sec = num
+            except Exception:
+                duration_sec = 15
+        duration_sec = min(30, max(5, duration_sec))
+
+        client = Client("facebook/MusicGen")
+        full_prompt = f"{genre} music, {mood} mood, {prompt}"
+        
+        logger.info(f"Submitting prediction to MusicGen: '{full_prompt}' for {duration_sec}s...")
+        result = client.predict(
+            text=full_prompt,
+            melody=None,
+            model="melody",
+            duration=duration_sec,
+            topk=250,
+            topp=0.0,
+            temperature=1.0,
+            cfg_coef=3.0,
+            api_name="/predict"
+        )
+        
+        if result and os.path.exists(result):
+            logger.info(f"MusicGen generated audio successfully: {result}")
+            with open(result, "rb") as f:
+                return f.read()
+        raise Exception("MusicGen did not return a valid audio file.")
+    except Exception as e:
+        logger.error(f"MusicGen generation failed: {e}", exc_info=True)
+        raise e
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 #  ROUTES
 # ═════════════════════════════════════════════════════════════════════════════
@@ -880,6 +1036,7 @@ def admin_settings():
             "lyrics_model": config.LYRICS_MODEL,
             "cover_model": config.COVER_MODEL,
             "audio_model": config.AUDIO_MODEL,
+            "suno_cookie": config.SUNO_COOKIE,
             "face_threshold": config.FACE_MATCH_THRESHOLD,
             "max_songs_per_user": 100,
             "app_name": "DHUN AI",
@@ -947,21 +1104,40 @@ def generate_song():
 
         # ── Step 3: Audio ─────────────────────────────────────────────
         audio_result = {"audio_url": None, "audio_b64": None}
-        if models["audio"] != "procedural":
+        audio_bytes = None
+        suno_cookie = models.get("suno_cookie")
+        
+        # Tier 1: Suno.com (if cookie is configured)
+        if suno_cookie:
+            logger.info("Suno cookie configured. Attempting Suno.com generation...")
             try:
-                audio_result = ai_generate_audio(title, lyrics, genre, mood, models["audio"])
+                audio_bytes = generate_suno_song(prompt, genre, mood, lyrics, title, suno_cookie)
+                logger.info("Successfully generated song via Suno!")
             except Exception as e:
-                logger.warning(f"Audio generation failed: {e}. Falling back to procedural.")
-
-        # Fallback to procedural if no audio generated
-        if not audio_result.get("audio_b64") and not audio_result.get("audio_url"):
+                logger.warning(f"Suno generation failed: {e}. Falling back to Hugging Face MusicGen...")
+        
+        # Tier 2: Hugging Face MusicGen
+        if not audio_bytes:
+            logger.info("Attempting Hugging Face MusicGen generation...")
             try:
-                logger.info(f"Generating procedural audio for: {title}")
-                wav_bytes = generate_procedural_wav(genre, mood, title)
-                audio_result["audio_b64"] = "data:audio/wav;base64," + base64.b64encode(wav_bytes).decode("utf-8")
-                audio_result["audio_url"] = f"/api/songs/{song_id}/audio"
+                audio_bytes = generate_musicgen_audio(prompt, genre, mood, duration)
+                logger.info("Successfully generated audio via Hugging Face MusicGen!")
+            except Exception as e:
+                logger.warning(f"MusicGen generation failed: {e}. Falling back to procedural synthesizer...")
+                
+        # Tier 3: Local Procedural Synthesizer (guaranteed fallback)
+        if not audio_bytes:
+            logger.info("Generating procedural audio...")
+            try:
+                audio_bytes = generate_procedural_wav(genre, mood, title)
             except Exception as e:
                 logger.error(f"Procedural audio generation failed: {e}", exc_info=True)
+                
+        if audio_bytes:
+            is_mp3 = audio_bytes.startswith(b"ID3") or b"lavf" in audio_bytes[:100].lower() or audio_bytes.startswith(b"\xff\xfb")
+            mime = "audio/mpeg" if is_mp3 else "audio/wav"
+            audio_result["audio_b64"] = f"data:{mime};base64," + base64.b64encode(audio_bytes).decode("utf-8")
+            audio_result["audio_url"] = f"/api/songs/{song_id}/audio"
 
         # ── Save to MongoDB ───────────────────────────────────────────
         song_doc = {

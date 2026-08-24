@@ -33,6 +33,7 @@ class Config:
     LYRICS_MODEL: str = os.environ.get("LYRICS_MODEL", "openrouter/free")
     COVER_MODEL: str = os.environ.get("COVER_MODEL", "pollinations")
     AUDIO_MODEL: str = os.environ.get("AUDIO_MODEL", "procedural")
+    SUNO_COOKIE: str = os.environ.get("SUNO_COOKIE", "")
 
     # ── Encryption ────────────────────────────────────────────────────
     @staticmethod
