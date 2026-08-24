@@ -39,14 +39,6 @@
 ═══════════════════════════════════════════════════════════════════════════ -->
 <div id="loading-screen">
   <div class="loader-content">
-    <div class="loader-logo">
-      <div class="loader-icon">
-        <img src="/static/icon-192.png" alt="Logo" style="width: 1em; height: 1em; border-radius: 20%;" />
-      </div>
-      <div class="loader-rings">
-        <span></span><span></span><span></span>
-      </div>
-    </div>
     <h1 class="loader-title">DHUN AI</h1>
     <p class="loader-sub">Loading AI models…</p>
     <div class="loader-bar-wrap">
@@ -316,6 +308,15 @@
             <option value="5 minutes">~5 min</option>
           </select>
         </div>
+        <div class="form-group">
+          <label class="form-label">Singer / Voice</label>
+          <select id="gen-vocal-type" class="form-select">
+            <option value="female" selected>👩 Female Singer</option>
+            <option value="male">👨 Male Singer</option>
+            <option value="duet">👫 Duet (Male + Female)</option>
+            <option value="instrumental">🎻 Instrumental (No Vocals)</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -395,6 +396,7 @@
         <div class="lyrics-meta">
           <span id="lyrics-genre-badge" class="genre-badge">—</span>
           <span id="lyrics-mood-badge" class="mood-badge">—</span>
+          <span id="lyrics-vocal-badge" class="vocal-badge vocal-female">—</span>
           <p id="lyrics-prompt" class="lyrics-prompt-text">—</p>
         </div>
       </div>

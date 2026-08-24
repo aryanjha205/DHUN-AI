@@ -458,6 +458,14 @@ function songCardHTML(s) {
   const coverURL = s.cover_url || `https://picsum.photos/seed/${s.song_id}/400/400`;
   const date = new Date(s.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   const playing = S.curSong?.song_id === s.song_id ? 'playing' : '';
+  const vocal_type = s.vocal_type || 'female';
+  const vocalLabelMap = {
+    'female': '👩 Female',
+    'male': '👨 Male',
+    'duet': '👫 Duet',
+    'instrumental': '🎻 Instrumental'
+  };
+  const vocalLabel = vocalLabelMap[vocal_type] || vocal_type;
 
   return `
   <div class="song-card ${playing}" id="card-${s.song_id}">
@@ -477,6 +485,7 @@ function songCardHTML(s) {
       <div class="song-meta">
         <span class="genre-badge">${escHtml(s.genre)}</span>
         <span class="mood-badge">${escHtml(s.mood)}</span>
+        <span class="vocal-badge vocal-${escHtml(vocal_type)}">${escHtml(vocalLabel)}</span>
       </div>
       <div class="song-footer">
         <span class="song-date">${date}</span>
@@ -582,9 +591,17 @@ function updatePlayerBar(song) {
   $('player-genre').textContent = `${song.genre} • ${song.mood}`;
 
   // Expanded player
+  const vocalLabels = {
+    'female': 'Female Singer',
+    'male': 'Male Singer',
+    'duet': 'Duet Vocals',
+    'instrumental': 'Instrumental'
+  };
+  const vocalText = vocalLabels[song.vocal_type || 'female'] || (song.vocal_type || 'Female Singer');
+
   $('exp-cover').src = coverURL;
   $('exp-title').textContent = song.title;
-  $('exp-genre-mood').textContent = `${song.genre} · ${song.mood} · ${song.language}`;
+  $('exp-genre-mood').textContent = `${song.genre} · ${song.mood} · ${song.language} · ${vocalText}`;
   $('exp-download-btn').onclick = () => downloadSong(song.song_id);
   $('exp-share-btn').onclick    = () => shareSong(song.song_id);
 }
@@ -678,11 +695,12 @@ window.showGenerator = () => openModal('generator-modal');
 window.hideGenerator = () => closeModal('generator-modal');
 
 window.generateSong = async () => {
-  const prompt   = $('gen-prompt').value.trim();
-  const genre    = $('gen-genre').value;
-  const mood     = $('gen-mood').value;
-  const language = $('gen-language').value;
-  const duration = $('gen-duration').value;
+  const prompt     = $('gen-prompt').value.trim();
+  const genre      = $('gen-genre').value;
+  const mood       = $('gen-mood').value;
+  const language   = $('gen-language').value;
+  const duration   = $('gen-duration').value;
+  const vocal_type = $('gen-vocal-type').value;
 
   if (!prompt) { notify('Please describe your song!', 'warning'); return; }
 
@@ -707,7 +725,7 @@ window.generateSong = async () => {
 
   try {
     const data = await callApi('POST', '/songs/generate',
-      { prompt, genre, mood, language, duration },
+      { prompt, genre, mood, language, duration, vocal_type },
       S.user.token
     );
 
@@ -776,10 +794,21 @@ window.openLyricsModal = (songId) => {
   const song = S.songs.find(s => s.song_id === songId);
   if (!song) return;
 
+  const vocal_type = song.vocal_type || 'female';
+  const modalVocalLabels = {
+    'female': '👩 Female',
+    'male': '👨 Male',
+    'duet': '👫 Duet',
+    'instrumental': '🎻 Instrumental'
+  };
+  const vocalText = modalVocalLabels[vocal_type] || vocal_type;
+
   $('lyrics-modal-title').textContent = song.title;
   $('lyrics-cover').src    = song.cover_url || `https://picsum.photos/seed/${songId}/80/80`;
   $('lyrics-genre-badge').textContent = song.genre;
   $('lyrics-mood-badge').textContent  = song.mood;
+  $('lyrics-vocal-badge').textContent = vocalText;
+  $('lyrics-vocal-badge').className   = `vocal-badge vocal-${vocal_type}`;
   $('lyrics-prompt').textContent = song.prompt;
   $('lyrics-text').textContent   = song.lyrics || '(No lyrics available)';
 

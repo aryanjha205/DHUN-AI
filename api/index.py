@@ -538,7 +538,7 @@ def generate_procedural_wav(genre: str, mood: str, title: str) -> bytes:
 
 
 # ── Suno.com Music Generator ──────────────────────────────────────────────────
-def generate_suno_song(prompt, genre, mood, lyrics, title, cookie_str):
+def generate_suno_song(prompt, genre, mood, lyrics, title, cookie_str, vocal_type="female"):
     import requests
     import time
     
@@ -595,11 +595,22 @@ def generate_suno_song(prompt, genre, mood, lyrics, title, cookie_str):
         "Referer": "https://suno.com/"
     }
     
+    make_instrumental = (vocal_type == "instrumental")
+    tags_list = [genre.lower(), mood.lower()]
+    if vocal_type == "female":
+        tags_list.append("female vocals")
+    elif vocal_type == "male":
+        tags_list.append("male vocals")
+    elif vocal_type == "duet":
+        tags_list.append("duet vocals")
+        
+    tags = ", ".join(tags_list)
+    
     payload = {
         "prompt": lyrics[:3000] if lyrics else prompt,
-        "tags": f"{genre.lower()}, {mood.lower()}",
+        "tags": tags,
         "title": title or f"My {genre} Song",
-        "make_instrumental": False,
+        "make_instrumental": make_instrumental,
         "mv": "chirp-v3-5"
     }
     
@@ -1070,6 +1081,7 @@ def generate_song():
         mood = data.get("mood", "Happy")
         language = data.get("language", "English")
         duration = data.get("duration", "3 minutes")
+        vocal_type = data.get("vocal_type", "female")
         face_id = request.user["face_id"]
 
         if not prompt:
@@ -1079,7 +1091,7 @@ def generate_song():
         models = _get_live_models(db)
         song_id = str(uuid.uuid4())
 
-        logger.info(f"Generating song for {face_id[:8]}…: '{prompt[:60]}'")
+        logger.info(f"Generating song for {face_id[:8]}…: '{prompt[:60]}' [Singer: {vocal_type}]")
 
         # ── Step 1: Lyrics ────────────────────────────────────────────
         try:
@@ -1111,7 +1123,7 @@ def generate_song():
         if suno_cookie:
             logger.info("Suno cookie configured. Attempting Suno.com generation...")
             try:
-                audio_bytes = generate_suno_song(prompt, genre, mood, lyrics, title, suno_cookie)
+                audio_bytes = generate_suno_song(prompt, genre, mood, lyrics, title, suno_cookie, vocal_type)
                 logger.info("Successfully generated song via Suno!")
             except Exception as e:
                 logger.warning(f"Suno generation failed: {e}. Falling back to Hugging Face MusicGen...")
@@ -1120,7 +1132,16 @@ def generate_song():
         if not audio_bytes:
             logger.info("Attempting Hugging Face MusicGen generation...")
             try:
-                audio_bytes = generate_musicgen_audio(prompt, genre, mood, duration)
+                musicgen_prompt = prompt
+                if vocal_type == "instrumental":
+                    musicgen_prompt += ", instrumental"
+                elif vocal_type == "female":
+                    musicgen_prompt += ", female singer voice"
+                elif vocal_type == "male":
+                    musicgen_prompt += ", male singer voice"
+                elif vocal_type == "duet":
+                    musicgen_prompt += ", duet male female singer voices"
+                audio_bytes = generate_musicgen_audio(musicgen_prompt, genre, mood, duration)
                 logger.info("Successfully generated audio via Hugging Face MusicGen!")
             except Exception as e:
                 logger.warning(f"MusicGen generation failed: {e}. Falling back to procedural synthesizer...")
@@ -1150,6 +1171,7 @@ def generate_song():
             "mood": mood,
             "language": language,
             "duration": duration,
+            "vocal_type": vocal_type,
             "cover_url": cover_url,
             "audio_url": f"/api/songs/{song_id}/audio" if audio_result.get("audio_b64") else audio_result.get("audio_url"),
             "audio_b64": audio_result.get("audio_b64"),  # stored but not returned in list
@@ -1271,4 +1293,4 @@ def increment_play(song_id):
 
 # ── Dev runner (not used on Vercel) ──────────────────────────────────────────
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5000, use_reloader=False)
